@@ -1,73 +1,84 @@
 
 # coding: utf-8
-
-# In[1]:
-
-import cv2                 
-import numpy as np        
-import os                 
-from random import shuffle
-from tqdm import tqdm     
+import os  
+import cv2           
+from time import time
+ 
 import pandas as pd
+import numpy as np 
+
+from random import shuffle  
+
+from sklearn.utils import shuffle
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import scale
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score,confusion_matrix,silhouette_score, homogeneity_score,adjusted_mutual_info_score,completeness_score,v_measure_score,adjusted_rand_score
+
 from matplotlib import pyplot as plt
-get_ipython().magic('matplotlib inline')
+from matplotlib.backends.backend_pdf import PdfPages as pdf
+%matplotlib inline
 
 TRAIN_DIR = 'I:/101_ObjectCategories/101_ObjectCategories/tick'
-cat_dir='I:/101_ObjectCategories/101_ObjectCategories'
+data_dir='I:/101_ObjectCategories/101_ObjectCategories'
 IMG_SIZE = 50
-LR = 1e-3
 
-
-# In[3]:
 
 def create_categories():    
     train=[]
     b=[]
     i=0
-    for categ in tqdm(os.listdir(cat_dir)[:10]):
-        path = os.path.join(cat_dir,categ)
-        i=i+1        
-        for img in (os.listdir(path))[:20]:
+    for categ in os.listdir(data_dir)[10:20]:
+        path = os.path.join(data_dir,categ)
+        i=i+1
+        for img in (os.listdir(path)):
             path2 = os.path.join(path,img)
-            if (os.path.exists(path2)):     
-                img = cv2.imread(path2,cv2.IMREAD_GRAYSCALE)
-                img = cv2.resize(img, (IMG_SIZE,IMG_SIZE))
-                img = img.reshape(50*50)
+            if (os.path.exists(path2)):
+                gray = cv2.imread(path2,cv2.IMREAD_GRAYSCALE)
+                img = cv2.equalizeHist(gray)
+                img = cv2.GaussianBlur(img,(5,5),0)
+#                img = cv2.Laplacian(img,cv2.CV_64F)
+                img= cv2.Canny(img,100,200)
+                kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
+                img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel)
+                img,cnts, _ = cv2.findContours(img.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                idx=0
+                for c in cnts:
+                    x,y,w,h = cv2.boundingRect(c)
+                    if w>50 and h>50:
+                        idx+=1
+                        n_img=gray[y:y+h,x:x+w]
+                img = cv2.equalizeHist(n_img)
+                img = cv2.GaussianBlur(img,(5,5),0)
+#                img= cv2.Canny(img,100,200)
+#                img = cv2.Laplacian(img,cv2.CV_64F)
+                img = cv2.resize(img, (IMG_Size,IMG_Size))
+                img = img.reshape(IMG_Size*IMG_Size)
                 train.append(list(img))
                 b.append(i)
     np.save('train_data.npy', train)
-    train_df=pd.DataFrame(train)
-    train_df['category']=b
-    return train_df
+    train=pd.DataFrame(train)
+    train['category']=b
+    return train
+data=shuffle(create_categories())
+train=data
+print(data.shape)
 
 
-# In[4]:
-
-train=create_categories()
-
-
-# In[5]:
-
-from sklearn.utils import shuffle
-train=shuffle(train)
-train
+from sklearn import preprocessing
+min_max_scaler = preprocessing.MinMaxScaler()
+x_scaled = min_max_scaler.fit_transform(train.iloc[:,:2500])
+data = pd.DataFrame(x_scaled)
+data['category']=train['category']
 
 
-# In[39]:
+ax = train.groupby('category').size().plot(kind='bar', figsize=(10,2))
 
-train.groupby('category').count()
-
-
-# In[7]:
-
-x=train[:,:2499]
-y=train['category'].as_matrix()
-
-
-# In[52]:
-
-x=x.as_matrix()
-
+n_samples, n_features = data.shape
+n_digits = len(np.unique(data.category))
+labels = data.category
+sample_size = len(data)
 
 # In[54]:
 
