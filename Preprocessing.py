@@ -82,6 +82,7 @@ sample_size = len(data)
 
 # In[54]:
 
+
 from sklearn import neighbors, datasets
 n=1
 clf = neighbors.KNeighborsClassifier(n, weights='distance')
